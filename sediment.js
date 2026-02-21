@@ -287,7 +287,7 @@ class Sediment {
 
         // Map to palette color
         const paletteIndex = Math.floor(Math.abs(combined) * this.palette.length) % this.palette.length;
-        const baseColor = this.palette[paletteIndex];
+        const baseColor = this.palette[paletteIndex] || this.palette[0] || { h: 0, s: 50, l: 50 };
 
         // Add distress/aging
         const distress = this.perlin.octaveNoise(x * 0.05, y * 0.05, 3, 0.7) * this.config.distressLevel;
@@ -345,7 +345,7 @@ class Sediment {
         let x = this.rng.range(0, this.width);
         let y = this.rng.range(0, this.height);
 
-        const paletteColor = this.rng.choice(this.palette);
+        const paletteColor = this.rng.choice(this.palette) || { h: 0, s: 50, l: 50 };
         const [r, g, b] = this.hslToRgb(paletteColor.h, paletteColor.s, paletteColor.l);
 
         this.ctx.beginPath();
@@ -484,8 +484,8 @@ class Sediment {
       Math.max(this.width, this.height) * 0.8
     );
 
-    const color1 = this.rng.choice(this.palette);
-    const color2 = this.rng.choice(this.palette);
+    const color1 = this.rng.choice(this.palette) || { h: 0, s: 50, l: 50 };
+    const color2 = this.rng.choice(this.palette) || { h: 180, s: 50, l: 50 };
 
     const [r1, g1, b1] = this.hslToRgb(color1.h, color1.s, color1.l);
     const [r2, g2, b2] = this.hslToRgb(color2.h, color2.s, color2.l);
@@ -575,7 +575,7 @@ class Sediment {
       const splitNoise = this.perlin.noise(x * 0.005, y * 0.005);
 
       if (Math.abs(splitNoise) > 0.3 && width > 20 && height > 20) {
-        const paletteColor = this.rng.choice(this.palette);
+        const paletteColor = this.rng.choice(this.palette) || { h: 0, s: 50, l: 50 };
         const [r, g, b] = this.hslToRgb(paletteColor.h, paletteColor.s, paletteColor.l);
 
         this.ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.1 / (depth + 1)})`;
@@ -627,7 +627,7 @@ class Sediment {
         centerX, centerY, radius
       );
 
-      const baseColor = this.rng.choice(this.palette);
+      const baseColor = this.rng.choice(this.palette) || { h: 0, s: 50, l: 50 };
       const shiftedHue = (baseColor.h + hueShift + 360) % 360;
       const [r, g, b] = this.hslToRgb(shiftedHue, baseColor.s * 0.6, baseColor.l);
 
