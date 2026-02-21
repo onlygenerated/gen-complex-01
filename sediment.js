@@ -240,6 +240,8 @@ class Sediment {
             l: this.rng.range(30, 70)
           });
         }
+        palette.push({ h: (baseHue + 60) % 360, s: this.rng.range(30, 50), l: this.rng.range(40, 70) });
+        palette.push({ h: (baseHue + 180) % 360, s: this.rng.range(30, 50), l: this.rng.range(40, 70) });
         break;
       case 'monochrome':
         for (let i = 0; i < 5; i++) {
@@ -284,7 +286,7 @@ class Sediment {
         const combined = baseNoise * 0.6 + detailNoise * 0.3 + cellInfluence * 0.1;
 
         // Map to palette color
-        const paletteIndex = Math.floor(combined * this.palette.length) % this.palette.length;
+        const paletteIndex = Math.floor(Math.abs(combined) * this.palette.length) % this.palette.length;
         const baseColor = this.palette[paletteIndex];
 
         // Add distress/aging
@@ -433,7 +435,8 @@ class Sediment {
       const flowVector = this.flowFields[0].getVector(p.x, p.y);
       const localNoise = this.perlin.noise(p.x * 0.01, p.y * 0.01);
 
-      const paletteColor = this.palette[Math.floor(Math.abs(localNoise) * this.palette.length) % this.palette.length];
+      const paletteIdx = Math.floor(Math.abs(localNoise) * this.palette.length) % this.palette.length;
+      const paletteColor = this.palette[paletteIdx] || this.palette[0];
       const [r, g, b] = this.hslToRgb(paletteColor.h, paletteColor.s * 0.6, paletteColor.l + 30);
 
       this.ctx.beginPath();
