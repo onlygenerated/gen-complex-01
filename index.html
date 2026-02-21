@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sediment - Generative Art</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 2em;
+      font-weight: normal;
+      letter-spacing: 0.3em;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      font-size: 0.9em;
+      color: #888;
+      letter-spacing: 0.1em;
+    }
+
+    #canvas-container {
+      position: relative;
+      margin: 20px 0;
+      box-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
+    }
+
+    #canvas {
+      display: block;
+      background: #000;
+    }
+
+    .controls {
+      display: flex;
+      gap: 15px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      padding: 12px 24px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      cursor: pointer;
+      transition: all 0.3s;
+      letter-spacing: 0.1em;
+    }
+
+    button:hover {
+      background: #2a2a2a;
+      border-color: #666;
+      transform: translateY(-2px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #seed-display {
+      background: #1a1a1a;
+      border: 1px solid #444;
+      padding: 12px 24px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      letter-spacing: 0.05em;
+      color: #888;
+    }
+
+    .info {
+      max-width: 800px;
+      text-align: center;
+      margin-top: 30px;
+      padding: 20px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      line-height: 1.6;
+    }
+
+    .info p {
+      margin-bottom: 10px;
+      color: #999;
+      font-size: 0.85em;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-size: 0.85em;
+      color: #666;
+      font-style: italic;
+    }
+
+    .loading {
+      color: #4a9eff !important;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 1.5em;
+      }
+
+      #canvas {
+        max-width: 100%;
+        height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SEDIMENT</h1>
+    <div class="subtitle">Multi-layered generative system</div>
+  </header>
+
+  <div id="canvas-container">
+    <canvas id="canvas" width="1200" height="1200"></canvas>
+  </div>
+
+  <div class="controls">
+    <button id="generate-btn">GENERATE</button>
+    <button id="save-btn">SAVE IMAGE</button>
+    <div id="seed-display">SEED: <span id="seed-value">-</span></div>
+  </div>
+
+  <div id="status"></div>
+
+  <div class="info">
+    <p>
+      Sediment explores multi-layered complexity through eleven interacting systems:
+      substrate terrain, crystalline structures, flow networks, optical meshes,
+      atmospheric particles, surface aberrations, color modulation, interference
+      patterns, granular texture, recursive subdivision, and color field distortion.
+    </p>
+    <p>
+      Each piece is deterministic from its seed and features emergent patterns
+      from the interaction of multiple algorithmic layers.
+    </p>
+  </div>
+
+  <script src="sediment.js"></script>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const generateBtn = document.getElementById('generate-btn');
+    const saveBtn = document.getElementById('save-btn');
+    const seedDisplay = document.getElementById('seed-value');
+    const status = document.getElementById('status');
+
+    let currentSeed = null;
+
+    function setStatus(message, isLoading = false) {
+      status.textContent = message;
+      if (isLoading) {
+        status.classList.add('loading');
+      } else {
+        status.classList.remove('loading');
+      }
+    }
+
+    function generateArt() {
+      generateBtn.disabled = true;
+      saveBtn.disabled = true;
+
+      // Generate random seed
+      currentSeed = Math.floor(Math.random() * 1000000);
+      seedDisplay.textContent = currentSeed;
+
+      setStatus('Generating...', true);
+
+      // Use setTimeout to allow UI to update
+      setTimeout(() => {
+        try {
+          const artwork = new Sediment(canvas, currentSeed);
+          artwork.render();
+          setStatus('Complete');
+          generateBtn.disabled = false;
+          saveBtn.disabled = false;
+        } catch (error) {
+          console.error('Error generating artwork:', error);
+          setStatus('Error: ' + error.message);
+          generateBtn.disabled = false;
+        }
+      }, 100);
+    }
+
+    function saveImage() {
+      if (!currentSeed) {
+        alert('Please generate an image first');
+        return;
+      }
+
+      const link = document.createElement('a');
+      link.download = `sediment-${currentSeed}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      setStatus(`Saved: sediment-${currentSeed}.png`);
+    }
+
+    generateBtn.addEventListener('click', generateArt);
+    saveBtn.addEventListener('click', saveImage);
+
+    // Generate initial artwork
+    window.addEventListener('load', () => {
+      setTimeout(generateArt, 500);
+    });
+  </script>
+</body>
+</html>

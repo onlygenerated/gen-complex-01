@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sediment Gallery - Multi-piece Viewer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: 2em;
+      font-weight: normal;
+      letter-spacing: 0.3em;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      font-size: 0.9em;
+      color: #888;
+      letter-spacing: 0.1em;
+    }
+
+    .controls {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    button {
+      background: #1a1a1a;
+      color: #e0e0e0;
+      border: 1px solid #444;
+      padding: 12px 24px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      cursor: pointer;
+      transition: all 0.3s;
+      letter-spacing: 0.1em;
+      margin: 0 5px;
+    }
+
+    button:hover {
+      background: #2a2a2a;
+      border-color: #666;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 30px;
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+
+    .piece {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      padding: 15px;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .piece:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 5px 30px rgba(255, 255, 255, 0.1);
+    }
+
+    .piece canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: #000;
+      margin-bottom: 10px;
+    }
+
+    .piece-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85em;
+      color: #888;
+    }
+
+    .seed {
+      letter-spacing: 0.05em;
+    }
+
+    .download-btn {
+      background: transparent;
+      border: 1px solid #555;
+      padding: 6px 12px;
+      font-size: 0.8em;
+      color: #aaa;
+    }
+
+    .download-btn:hover {
+      background: #2a2a2a;
+      color: #e0e0e0;
+    }
+
+    #status {
+      text-align: center;
+      margin: 20px 0;
+      font-size: 0.85em;
+      color: #666;
+      font-style: italic;
+    }
+
+    .loading {
+      color: #4a9eff !important;
+    }
+
+    @media (max-width: 768px) {
+      .gallery {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 1.5em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SEDIMENT GALLERY</h1>
+    <div class="subtitle">Multi-piece generative viewer</div>
+  </header>
+
+  <div class="controls">
+    <button id="generate-6">GENERATE 6 PIECES</button>
+    <button id="generate-12">GENERATE 12 PIECES</button>
+    <button id="clear-gallery">CLEAR GALLERY</button>
+  </div>
+
+  <div id="status"></div>
+
+  <div class="gallery" id="gallery"></div>
+
+  <script src="sediment.js"></script>
+  <script>
+    const gallery = document.getElementById('gallery');
+    const status = document.getElementById('status');
+    const generate6Btn = document.getElementById('generate-6');
+    const generate12Btn = document.getElementById('generate-12');
+    const clearBtn = document.getElementById('clear-gallery');
+
+    function setStatus(message, isLoading = false) {
+      status.textContent = message;
+      if (isLoading) {
+        status.classList.add('loading');
+      } else {
+        status.classList.remove('loading');
+      }
+    }
+
+    function createPiece(seed) {
+      const piece = document.createElement('div');
+      piece.className = 'piece';
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 600;
+      canvas.height = 600;
+
+      const info = document.createElement('div');
+      info.className = 'piece-info';
+
+      const seedSpan = document.createElement('span');
+      seedSpan.className = 'seed';
+      seedSpan.textContent = `SEED: ${seed}`;
+
+      const downloadBtn = document.createElement('button');
+      downloadBtn.className = 'download-btn';
+      downloadBtn.textContent = 'DOWNLOAD';
+      downloadBtn.onclick = () => downloadPiece(canvas, seed);
+
+      info.appendChild(seedSpan);
+      info.appendChild(downloadBtn);
+
+      piece.appendChild(canvas);
+      piece.appendChild(info);
+
+      gallery.appendChild(piece);
+
+      return canvas;
+    }
+
+    function downloadPiece(canvas, seed) {
+      const link = document.createElement('a');
+      link.download = `sediment-${seed}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    async function generatePieces(count) {
+      generate6Btn.disabled = true;
+      generate12Btn.disabled = true;
+
+      const seeds = [];
+      for (let i = 0; i < count; i++) {
+        seeds.push(Math.floor(Math.random() * 1000000));
+      }
+
+      for (let i = 0; i < seeds.length; i++) {
+        setStatus(`Generating piece ${i + 1} of ${count}...`, true);
+
+        const seed = seeds[i];
+        const canvas = createPiece(seed);
+
+        // Render with small delay to allow UI updates
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        try {
+          const artwork = new Sediment(canvas, seed);
+          artwork.render();
+        } catch (error) {
+          console.error(`Error generating piece ${seed}:`, error);
+        }
+      }
+
+      setStatus(`Generated ${count} pieces`);
+      generate6Btn.disabled = false;
+      generate12Btn.disabled = false;
+    }
+
+    function clearGallery() {
+      gallery.innerHTML = '';
+      setStatus('Gallery cleared');
+    }
+
+    generate6Btn.addEventListener('click', () => generatePieces(6));
+    generate12Btn.addEventListener('click', () => generatePieces(12));
+    clearBtn.addEventListener('click', clearGallery);
+
+    // Generate initial 6 pieces on load
+    window.addEventListener('load', () => {
+      setTimeout(() => generatePieces(6), 500);
+    });
+  </script>
+</body>
+</html>
