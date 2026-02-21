@@ -123,6 +123,19 @@
       color: #4a9eff !important;
     }
 
+    .error {
+      color: #ff4444 !important;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 0.75em;
+      max-width: 600px;
+      text-align: left;
+      margin: 20px auto;
+      padding: 15px;
+      background: #1a0000;
+      border: 1px solid #ff4444;
+    }
+
     @media (max-width: 768px) {
       h1 {
         font-size: 1.5em;
@@ -168,6 +181,16 @@
 
   <script src="sediment.js"></script>
   <script>
+    // Global error handler
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+      const errorBox = document.createElement('div');
+      errorBox.className = 'error';
+      errorBox.style.cssText = 'position: fixed; top: 20px; left: 20px; right: 20px; z-index: 9999;';
+      errorBox.textContent = `GLOBAL ERROR:\n${msg}\n\nFile: ${url}\nLine: ${lineNo}\nColumn: ${columnNo}\n\n${error ? error.stack : ''}`;
+      document.body.appendChild(errorBox);
+      return false;
+    };
+
     const canvas = document.getElementById('canvas');
     const generateBtn = document.getElementById('generate-btn');
     const saveBtn = document.getElementById('save-btn');
@@ -178,6 +201,7 @@
 
     function setStatus(message, isLoading = false) {
       status.textContent = message;
+      status.classList.remove('error');
       if (isLoading) {
         status.classList.add('loading');
       } else {
@@ -205,7 +229,10 @@
           saveBtn.disabled = false;
         } catch (error) {
           console.error('Error generating artwork:', error);
-          setStatus('Error: ' + error.message);
+          const errorMsg = `ERROR: ${error.message}\n\nStack:\n${error.stack}`;
+          status.textContent = errorMsg;
+          status.classList.add('error');
+          status.classList.remove('loading');
           generateBtn.disabled = false;
         }
       }, 100);
