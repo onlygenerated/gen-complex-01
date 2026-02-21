@@ -189,8 +189,11 @@ class Sediment {
     this.height = canvas.height;
     this.rng = new SeededRandom(seed);
 
+    console.log(`Initializing Sediment with seed: ${seed}, canvas: ${this.width}x${this.height}`);
+
     // Color palette generation
     this.palette = this.generatePalette();
+    console.log(`Generated palette with ${this.palette.length} colors`);
 
     // Initialize layers
     this.perlin = new PerlinNoise(this.rng);

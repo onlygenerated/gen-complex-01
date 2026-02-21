@@ -119,6 +119,45 @@
       font-style: italic;
     }
 
+    #loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 20px;
+      z-index: 10;
+    }
+
+    #loading-overlay.active {
+      display: flex;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid #333;
+      border-top: 4px solid #4a9eff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    #progress-text {
+      color: #4a9eff;
+      font-size: 0.9em;
+      letter-spacing: 0.1em;
+    }
+
     .loading {
       color: #4a9eff !important;
     }
@@ -152,11 +191,15 @@
   <header>
     <h1>SEDIMENT</h1>
     <div class="subtitle">Multi-layered generative system</div>
-    <div class="subtitle" style="margin-top: 5px; font-size: 0.7em; color: #555;">v2.2 - 2026-02-21 17:33 EST</div>
+    <div class="subtitle" style="margin-top: 5px; font-size: 0.7em; color: #555;">v2.3 - 2026-02-21 17:41 EST</div>
   </header>
 
   <div id="canvas-container">
     <canvas id="canvas" width="1200" height="1200"></canvas>
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+      <div id="progress-text">GENERATING...</div>
+    </div>
   </div>
 
   <div class="controls">
@@ -197,6 +240,8 @@
     const saveBtn = document.getElementById('save-btn');
     const seedDisplay = document.getElementById('seed-value');
     const status = document.getElementById('status');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const progressText = document.getElementById('progress-text');
 
     let currentSeed = null;
 
@@ -219,17 +264,36 @@
       seedDisplay.textContent = currentSeed;
 
       setStatus('Generating...', true);
+      loadingOverlay.classList.add('active');
+      progressText.textContent = 'GENERATING...';
 
       // Use setTimeout to allow UI to update
       setTimeout(() => {
         try {
           const artwork = new Sediment(canvas, currentSeed);
+
+          // Intercept console.log to show progress
+          const originalLog = console.log;
+          console.log = function(...args) {
+            originalLog.apply(console, args);
+            const msg = args.join(' ');
+            if (msg.startsWith('Rendering')) {
+              progressText.textContent = msg.toUpperCase();
+            }
+          };
+
           artwork.render();
+
+          // Restore console.log
+          console.log = originalLog;
+
+          loadingOverlay.classList.remove('active');
           setStatus('Complete');
           generateBtn.disabled = false;
           saveBtn.disabled = false;
         } catch (error) {
           console.error('Error generating artwork:', error);
+          loadingOverlay.classList.remove('active');
           const errorMsg = `ERROR: ${error.message}\n\nStack:\n${error.stack}`;
           status.textContent = errorMsg;
           status.classList.add('error');
