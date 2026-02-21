@@ -202,19 +202,22 @@ class Sediment {
       voronoiCount: this.getVoronoiCount(),
       voronoiInfluenceVariation: this.rng.range(0.1, 2.5),
 
-      // Layer emphasis - each layer gets random prominence (0 = skip, 1 = full)
+      // Layer emphasis - favor large morphological shapes over texture
       layerEmphasis: {
-        substrate: this.rng.range(0.5, 1.0), // Always visible but can be subtle
-        crystalline: this.rng.range(0, 1.0),
-        flow: this.rng.range(0, 1.0),
-        opticalMesh: this.rng.range(0, 1.0),
-        dust: this.rng.range(0, 1.0),
-        aberrations: this.rng.range(0, 1.0),
-        colorMod: this.rng.range(0, 1.0),
-        interference: this.rng.range(0, 1.0),
-        grain: this.rng.range(0, 1.0),
-        subdivision: this.rng.range(0, 1.0),
-        colorDistortion: this.rng.range(0, 1.0)
+        substrate: this.rng.range(0.3, 1.0),
+        crystalline: this.rng.range(0.3, 1.0),  // Voronoi - emphasized
+        flow: this.rng.range(0.2, 1.0),
+        organicBlobs: this.rng.range(0.4, 1.0), // NEW: Large organic shapes
+        gradientZones: this.rng.range(0.3, 1.0), // NEW: Color regions
+        metaballs: this.rng.range(0, 1.0),       // NEW: Soft blob intersections
+        opticalMesh: this.rng.range(0, 0.3),     // Reduced
+        dust: this.rng.range(0, 0.2),            // Reduced
+        aberrations: this.rng.range(0, 0.2),     // Reduced
+        colorMod: this.rng.range(0.2, 0.8),
+        interference: this.rng.range(0, 0.5),
+        grain: this.rng.range(0, 0.1),           // Minimal
+        subdivision: this.rng.range(0, 0.6),
+        colorDistortion: this.rng.range(0.2, 0.8)
       },
 
       // Flow field scale variation
@@ -253,11 +256,11 @@ class Sediment {
   getVoronoiCount() {
     const style = this.config ? this.config.voronoiStyle : this.rng.choice(['uniform_small', 'uniform_large', 'mixed', 'sparse_large']);
     switch (style) {
-      case 'uniform_small': return this.rng.int(80, 150); // Many small cells
-      case 'uniform_large': return this.rng.int(8, 20);   // Few large cells
-      case 'sparse_large': return this.rng.int(3, 10);    // Very few huge cells
+      case 'uniform_small': return this.rng.int(60, 100); // Small cells (reduced from 80-150)
+      case 'uniform_large': return this.rng.int(5, 12);   // Large cells
+      case 'sparse_large': return this.rng.int(2, 6);     // Huge cells (more dramatic)
       case 'mixed':
-      default: return this.rng.int(30, 70);               // Mixed sizes
+      default: return this.rng.int(15, 40);               // Mixed (reduced from 30-70)
     }
   }
 
@@ -454,6 +457,162 @@ class Sediment {
         this.ctx.stroke();
       }
     });
+
+    this.ctx.globalCompositeOperation = 'source-over';
+  }
+
+  renderOrganicBlobs() {
+    if (this.config.layerEmphasis.organicBlobs < 0.1) return;
+    this.ctx.globalCompositeOperation = this.rng.choice(['overlay', 'multiply', 'screen']);
+
+    // Large organic shapes using perlin noise contours
+    const numBlobs = this.rng.int(3, 8);
+    const blobScale = this.rng.range(0.001, 0.004);
+    const threshold = this.rng.range(0.3, 0.7);
+
+    for (let blob = 0; blob < numBlobs; blob++) {
+      const offsetX = this.rng.range(0, 1000);
+      const offsetY = this.rng.range(0, 1000);
+      const paletteColor = this.rng.choice(this.palette) || { h: 0, s: 50, l: 50 };
+      const [r, g, b] = this.hslToRgb(paletteColor.h, paletteColor.s, paletteColor.l);
+
+      const imageData = this.ctx.createImageData(this.width, this.height);
+      const data = imageData.data;
+
+      for (let y = 0; y < this.height; y++) {
+        for (let x = 0; x < this.width; x++) {
+          const noise = this.perlin.octaveNoise(
+            (x + offsetX) * blobScale,
+            (y + offsetY) * blobScale,
+            4,
+            0.5
+          );
+
+          if (noise > threshold) {
+            const idx = (y * this.width + x) * 4;
+            const alpha = (noise - threshold) / (1 - threshold) * 0.4 * this.config.layerEmphasis.organicBlobs;
+            data[idx] = r;
+            data[idx + 1] = g;
+            data[idx + 2] = b;
+            data[idx + 3] = Math.floor(alpha * 255);
+          }
+        }
+      }
+
+      this.ctx.putImageData(imageData, 0, 0);
+    }
+
+    this.ctx.globalCompositeOperation = 'source-over';
+  }
+
+  renderMetaballs() {
+    if (this.config.layerEmphasis.metaballs < 0.1) return;
+    this.ctx.globalCompositeOperation = 'screen';
+
+    // Soft circular fields that blend together
+    const numBalls = this.rng.int(5, 15);
+    const balls = [];
+
+    for (let i = 0; i < numBalls; i++) {
+      balls.push({
+        x: this.rng.range(0, this.width),
+        y: this.rng.range(0, this.height),
+        radius: this.rng.range(this.width * 0.1, this.width * 0.4),
+        color: this.rng.choice(this.palette) || { h: 0, s: 50, l: 50 }
+      });
+    }
+
+    const imageData = this.ctx.createImageData(this.width, this.height);
+    const data = imageData.data;
+
+    for (let y = 0; y < this.height; y++) {
+      for (let x = 0; x < this.width; x++) {
+        let totalInfluence = 0;
+        let colorSum = { r: 0, g: 0, b: 0 };
+
+        // Sum influence from all metaballs
+        for (const ball of balls) {
+          const dx = x - ball.x;
+          const dy = y - ball.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const influence = Math.max(0, 1 - (dist / ball.radius));
+
+          if (influence > 0) {
+            totalInfluence += influence;
+            const [r, g, b] = this.hslToRgb(ball.color.h, ball.color.s, ball.color.l);
+            colorSum.r += r * influence;
+            colorSum.g += g * influence;
+            colorSum.b += b * influence;
+          }
+        }
+
+        if (totalInfluence > 0.3) {
+          const idx = (y * this.width + x) * 4;
+          const alpha = Math.min(totalInfluence, 1) * 0.5 * this.config.layerEmphasis.metaballs;
+          data[idx] = colorSum.r / totalInfluence;
+          data[idx + 1] = colorSum.g / totalInfluence;
+          data[idx + 2] = colorSum.b / totalInfluence;
+          data[idx + 3] = Math.floor(alpha * 255);
+        }
+      }
+    }
+
+    this.ctx.putImageData(imageData, 0, 0);
+    this.ctx.globalCompositeOperation = 'source-over';
+  }
+
+  renderGradientZones() {
+    if (this.config.layerEmphasis.gradientZones < 0.1) return;
+    this.ctx.globalCompositeOperation = 'overlay';
+
+    // Large gradient zones with varied shapes
+    const numZones = this.rng.int(2, 5);
+
+    for (let i = 0; i < numZones; i++) {
+      const type = this.rng.choice(['radial', 'linear', 'conic']);
+      const color1 = this.rng.choice(this.palette) || { h: 0, s: 50, l: 50 };
+      const color2 = this.rng.choice(this.palette) || { h: 180, s: 50, l: 50 };
+
+      let gradient;
+
+      if (type === 'radial') {
+        gradient = this.ctx.createRadialGradient(
+          this.rng.range(0, this.width),
+          this.rng.range(0, this.height),
+          0,
+          this.rng.range(0, this.width),
+          this.rng.range(0, this.height),
+          this.rng.range(this.width * 0.5, this.width * 1.2)
+        );
+      } else if (type === 'linear') {
+        gradient = this.ctx.createLinearGradient(
+          this.rng.range(0, this.width),
+          this.rng.range(0, this.height),
+          this.rng.range(0, this.width),
+          this.rng.range(0, this.height)
+        );
+      } else {
+        // Conic approximation with radial
+        gradient = this.ctx.createRadialGradient(
+          this.width / 2,
+          this.height / 2,
+          0,
+          this.width / 2,
+          this.height / 2,
+          Math.max(this.width, this.height) * 0.7
+        );
+      }
+
+      const [r1, g1, b1] = this.hslToRgb(color1.h, color1.s, color1.l);
+      const [r2, g2, b2] = this.hslToRgb(color2.h, color2.s, color2.l);
+
+      const alpha = 0.3 * this.config.layerEmphasis.gradientZones;
+      gradient.addColorStop(0, `rgba(${r1}, ${g1}, ${b1}, ${alpha})`);
+      gradient.addColorStop(1, `rgba(${r2}, ${g2}, ${b2}, ${alpha})`);
+
+      this.ctx.fillStyle = gradient;
+      this.ctx.fillRect(0, 0, this.width, this.height);
+    }
 
     this.ctx.globalCompositeOperation = 'source-over';
   }
@@ -745,6 +904,15 @@ class Sediment {
 
     console.log('Rendering crystalline structures...');
     this.renderCrystallineStructures();
+
+    console.log('Rendering organic blobs...');
+    this.renderOrganicBlobs();
+
+    console.log('Rendering gradient zones...');
+    this.renderGradientZones();
+
+    console.log('Rendering metaballs...');
+    this.renderMetaballs();
 
     console.log('Rendering flow networks...');
     this.renderFlowNetworks();
