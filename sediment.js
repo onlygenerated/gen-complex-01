@@ -108,7 +108,7 @@ class PerlinNoise {
 }
 
 class VoronoiField {
-  constructor(rng, width, height, numPoints) {
+  constructor(rng, width, height, numPoints, influenceVariation = 1.0) {
     this.points = [];
     this.colors = [];
 
@@ -116,7 +116,7 @@ class VoronoiField {
       this.points.push({
         x: rng.range(0, width),
         y: rng.range(0, height),
-        influence: rng.range(0.5, 2.0)
+        influence: rng.range(0.5 / influenceVariation, 2.0 * influenceVariation)
       });
 
       this.colors.push({
@@ -195,23 +195,97 @@ class Sediment {
     this.palette = this.generatePalette();
     console.log(`Generated palette with ${this.palette.length} colors`);
 
-    // Initialize layers
-    this.perlin = new PerlinNoise(this.rng);
-    this.voronoi = new VoronoiField(this.rng, this.width, this.height, this.rng.int(40, 80));
-    this.flowFields = [
-      new FlowField(this.rng, this.width, this.height, 20, 0.01, 4),
-      new FlowField(this.rng, this.width, this.height, 10, 0.02, 3),
-      new FlowField(this.rng, this.width, this.height, 5, 0.04, 2)
-    ];
-
-    // Configuration variants
+    // Configuration variants - highly variable composition
     this.config = {
+      // Voronoi variation: either uniform small, mixed, or few large cells
+      voronoiStyle: this.rng.choice(['uniform_small', 'uniform_large', 'mixed', 'sparse_large']),
+      voronoiCount: this.getVoronoiCount(),
+      voronoiInfluenceVariation: this.rng.range(0.1, 2.5),
+
+      // Layer emphasis - each layer gets random prominence (0 = skip, 1 = full)
+      layerEmphasis: {
+        substrate: this.rng.range(0.5, 1.0), // Always visible but can be subtle
+        crystalline: this.rng.range(0, 1.0),
+        flow: this.rng.range(0, 1.0),
+        opticalMesh: this.rng.range(0, 1.0),
+        dust: this.rng.range(0, 1.0),
+        aberrations: this.rng.range(0, 1.0),
+        colorMod: this.rng.range(0, 1.0),
+        interference: this.rng.range(0, 1.0),
+        grain: this.rng.range(0, 1.0),
+        subdivision: this.rng.range(0, 1.0),
+        colorDistortion: this.rng.range(0, 1.0)
+      },
+
+      // Flow field scale variation
+      flowScaleMode: this.rng.choice(['micro', 'medium', 'macro', 'mixed']),
+      flowIntensity: this.rng.range(0.2, 1.5),
+      flowParticleCount: this.rng.int(500, 2500),
+
+      // Other layer scales
+      meshDensity: this.rng.int(2, 9),
+      meshScale: this.rng.range(20, 150),
+      dustParticles: this.rng.int(1000, 12000),
+      dustScale: this.rng.range(0.5, 4),
+      grainDensity: this.rng.range(0.1, 1.0),
+
+      // Substrate variety
       substrateStyle: this.rng.choice(['abraded', 'crystalline', 'organic', 'geometric']),
-      flowIntensity: this.rng.range(0.3, 1.0),
-      meshDensity: this.rng.int(3, 7),
-      dustParticles: this.rng.int(2000, 8000),
-      distressLevel: this.rng.range(0.2, 0.8)
+      substrateScale: this.rng.range(0.002, 0.008),
+      distressLevel: this.rng.range(0.1, 0.9)
     };
+
+    console.log('Layer emphasis:', this.config.layerEmphasis);
+    console.log('Voronoi style:', this.config.voronoiStyle, 'count:', this.config.voronoiCount);
+
+    // Initialize layers with varied parameters
+    this.perlin = new PerlinNoise(this.rng);
+    this.voronoi = new VoronoiField(
+      this.rng,
+      this.width,
+      this.height,
+      this.config.voronoiCount,
+      this.config.voronoiInfluenceVariation
+    );
+    this.flowFields = this.createFlowFields();
+  }
+
+  getVoronoiCount() {
+    const style = this.config ? this.config.voronoiStyle : this.rng.choice(['uniform_small', 'uniform_large', 'mixed', 'sparse_large']);
+    switch (style) {
+      case 'uniform_small': return this.rng.int(80, 150); // Many small cells
+      case 'uniform_large': return this.rng.int(8, 20);   // Few large cells
+      case 'sparse_large': return this.rng.int(3, 10);    // Very few huge cells
+      case 'mixed':
+      default: return this.rng.int(30, 70);               // Mixed sizes
+    }
+  }
+
+  createFlowFields() {
+    const mode = this.config.flowScaleMode;
+    switch (mode) {
+      case 'micro':
+        return [
+          new FlowField(this.rng, this.width, this.height, 5, 0.04, 2),
+          new FlowField(this.rng, this.width, this.height, 3, 0.08, 2)
+        ];
+      case 'macro':
+        return [
+          new FlowField(this.rng, this.width, this.height, 40, 0.005, 5),
+          new FlowField(this.rng, this.width, this.height, 30, 0.008, 4)
+        ];
+      case 'mixed':
+        return [
+          new FlowField(this.rng, this.width, this.height, 20, 0.01, 4),
+          new FlowField(this.rng, this.width, this.height, 10, 0.02, 3),
+          new FlowField(this.rng, this.width, this.height, 5, 0.04, 2)
+        ];
+      case 'medium':
+      default:
+        return [
+          new FlowField(this.rng, this.width, this.height, 15, 0.015, 3)
+        ];
+    }
   }
 
   generatePalette() {
@@ -273,13 +347,15 @@ class Sediment {
     const imageData = this.ctx.createImageData(this.width, this.height);
     const data = imageData.data;
 
+    const scale = this.config.substrateScale;
+
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const idx = (y * this.width + x) * 4;
 
-        // Multi-octave noise for base terrain
-        const baseNoise = this.perlin.octaveNoise(x * 0.003, y * 0.003, 6, 0.5);
-        const detailNoise = this.perlin.octaveNoise(x * 0.02, y * 0.02, 4, 0.6);
+        // Multi-octave noise for base terrain with variable scale
+        const baseNoise = this.perlin.octaveNoise(x * scale, y * scale, 6, 0.5);
+        const detailNoise = this.perlin.octaveNoise(x * scale * 6, y * scale * 6, 4, 0.6);
 
         // Voronoi cell influence
         const cell = this.voronoi.getCell(x, y);
@@ -312,7 +388,9 @@ class Sediment {
   }
 
   renderCrystallineStructures() {
+    if (this.config.layerEmphasis.crystalline < 0.1) return; // Skip if too low
     this.ctx.globalCompositeOperation = 'overlay';
+    this.ctx.globalAlpha = this.config.layerEmphasis.crystalline;
 
     // Draw Voronoi cells with edge detection
     const cellSize = 2;
@@ -333,16 +411,19 @@ class Sediment {
       }
     }
 
+    this.ctx.globalAlpha = 1.0;
     this.ctx.globalCompositeOperation = 'source-over';
   }
 
   renderFlowNetworks() {
+    if (this.config.layerEmphasis.flow < 0.1) return;
     this.ctx.globalCompositeOperation = 'soft-light';
 
     // Multiple flow field layers with different properties
+    const baseParticles = this.config.flowParticleCount;
     this.flowFields.forEach((field, fieldIndex) => {
-      const particlesPerField = this.rng.int(800, 1500);
-      const strokeWeight = 1.5 - fieldIndex * 0.3;
+      const particlesPerField = Math.floor(baseParticles / this.flowFields.length * this.rng.range(0.7, 1.3));
+      const strokeWeight = (1.5 - fieldIndex * 0.3) * this.config.layerEmphasis.flow;
 
       for (let i = 0; i < particlesPerField; i++) {
         let x = this.rng.range(0, this.width);
@@ -378,12 +459,13 @@ class Sediment {
   }
 
   renderOpticalMeshes() {
+    if (this.config.layerEmphasis.opticalMesh < 0.1) return;
     this.ctx.globalCompositeOperation = 'screen';
 
-    const meshLayers = this.config.meshDensity;
+    const meshLayers = Math.floor(this.config.meshDensity * this.config.layerEmphasis.opticalMesh);
 
     for (let layer = 0; layer < meshLayers; layer++) {
-      const gridSize = this.rng.range(30, 120);
+      const gridSize = this.config.meshScale * this.rng.range(0.7, 1.3);
       const rotation = this.rng.range(0, Math.PI);
       const offsetX = this.rng.range(0, gridSize);
       const offsetY = this.rng.range(0, gridSize);
@@ -422,6 +504,7 @@ class Sediment {
   }
 
   renderAtmosphericDust() {
+    if (this.config.layerEmphasis.dust < 0.1) return;
     this.ctx.globalCompositeOperation = 'lighten';
 
     const particles = [];
@@ -429,7 +512,7 @@ class Sediment {
       particles.push({
         x: this.rng.range(0, this.width),
         y: this.rng.range(0, this.height),
-        size: this.rng.range(0.5, 3),
+        size: this.rng.range(0.5, 3) * this.config.dustScale,
         drift: this.rng.range(-1, 1)
       });
     }
@@ -452,6 +535,7 @@ class Sediment {
   }
 
   renderSurfaceAberrations() {
+    if (this.config.layerEmphasis.aberrations < 0.1) return;
     this.ctx.globalCompositeOperation = 'multiply';
 
     // Fine detail texture overlay
@@ -475,6 +559,7 @@ class Sediment {
   }
 
   renderColorModulation() {
+    if (this.config.layerEmphasis.colorMod < 0.1) return;
     this.ctx.globalCompositeOperation = 'overlay';
 
     // Large-scale color washes
@@ -503,6 +588,7 @@ class Sediment {
   }
 
   renderInterferencePatterns() {
+    if (this.config.layerEmphasis.interference < 0.1) return;
     this.ctx.globalCompositeOperation = 'overlay';
 
     // Create wave interference patterns (Kane-inspired optical effects)
@@ -546,10 +632,11 @@ class Sediment {
   }
 
   renderGranularTexture() {
+    if (this.config.layerEmphasis.grain < 0.1) return;
     this.ctx.globalCompositeOperation = 'darken';
 
     // Fine-grain noise similar to Rayner's abraded surfaces
-    const grainDensity = this.rng.range(0.3, 0.7);
+    const grainDensity = this.config.grainDensity * this.config.layerEmphasis.grain;
     const totalGrains = Math.floor(this.width * this.height * grainDensity * 0.001);
 
     for (let i = 0; i < totalGrains; i++) {
@@ -569,6 +656,7 @@ class Sediment {
   }
 
   renderRecursiveSubdivision() {
+    if (this.config.layerEmphasis.subdivision < 0.1) return;
     this.ctx.globalCompositeOperation = 'soft-light';
 
     // De Giuli-inspired emergent complexity from simple recursive rules
@@ -614,6 +702,7 @@ class Sediment {
   }
 
   renderColorFieldDistortion() {
+    if (this.config.layerEmphasis.colorDistortion < 0.1) return;
     this.ctx.globalCompositeOperation = 'hue';
 
     // Create zones of color shift using noise fields
