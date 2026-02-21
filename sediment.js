@@ -35,7 +35,8 @@ class SeededRandom {
   }
 
   choice(arr) {
-    return arr[this.int(0, arr.length)];
+    if (arr.length === 0) return undefined;
+    return arr[Math.floor(this.next() * arr.length)];
   }
 }
 
